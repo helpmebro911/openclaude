@@ -41,6 +41,13 @@ export function filterSettingsEnvForExplicitProvider(
     delete filtered[key]
   }
 
+  if (explicitProvider === 'ollama') {
+    delete filtered.OPENAI_BASE_URL
+    delete filtered.OPENAI_MODEL
+    delete filtered.OPENAI_API_KEY
+    return filtered
+  }
+
   if (explicitProvider === 'github') {
     if (!isGithubModel(filtered.OPENAI_MODEL)) {
       delete filtered.OPENAI_MODEL

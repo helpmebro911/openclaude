@@ -100,4 +100,17 @@ describe('filterSettingsEnvForExplicitProvider', () => {
       }),
     ).toEqual({ OTHER: 'keep-me' })
   })
+
+  test('preserves explicit ollama startup intent by stripping OpenAI routing settings', () => {
+    process.env.CLAUDE_CODE_EXPLICIT_PROVIDER = 'ollama'
+
+    expect(
+      filterSettingsEnvForExplicitProvider({
+        OPENAI_BASE_URL: 'https://api.openai.com/v1',
+        OPENAI_MODEL: 'gpt-4o',
+        OPENAI_API_KEY: 'sk-test',
+        OTHER: 'keep-me',
+      }),
+    ).toEqual({ OTHER: 'keep-me' })
+  })
 })
