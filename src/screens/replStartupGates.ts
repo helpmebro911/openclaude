@@ -10,45 +10,26 @@
  * promptTypingSuppressionActive is false before the user has typed anything,
  * getFocusedInputDialog() returns the dialog, unmounting PromptInput entirely.
  *
- * The fix gates startup checks on actual prompt readiness — either the user
- * has started typing (inputValue is non-empty) or has submitted their first
- * message. A pure timeout is insufficient because pausing for >1.5s before
- * typing would still allow dialogs to steal focus.
+ * The fix gates startup checks on actual prompt interaction. A pure timeout
+ * or grace period is insufficient because pausing before typing would still
+ * allow dialogs to steal focus. Only the user's first submission guarantees
+ * the prompt is no longer in the vulnerable pre-interaction window.
  */
-
-const STARTUP_GRACE_PERIOD_MS = 3000
 
 /**
  * Determines whether startup checks should run.
  *
- * Startup checks are deferred until one of:
- * 1. The user has typed something into the prompt (inputValue non-empty)
- * 2. The user has submitted their first message (hasHadFirstSubmission)
- * 3. The grace period has elapsed AND the user is not actively typing
- *    (fallback for long idle periods where checks should eventually run,
- *    but only when it won't interrupt an active typing session)
+ * Startup checks are deferred until the user has submitted their first
+ * message. This guarantees the prompt was the first thing the user interacted
+ * with, so no recommendation dialog can steal focus before the first keystroke.
  */
 export function shouldRunStartupChecks(options: {
   isRemoteSession: boolean;
   hasStarted: boolean;
-  promptTypingSuppressionActive: boolean;
   hasHadFirstSubmission: boolean;
-  gracePeriodElapsed: boolean;
 }): boolean {
   if (options.isRemoteSession) return false;
   if (options.hasStarted) return false;
-
-  // User has submitted their first message — safe to run checks
-  if (options.hasHadFirstSubmission) return true;
-
-  // User has typed something and grace period has passed — safe once they stop
-  if (options.promptTypingSuppressionActive && options.gracePeriodElapsed) return false;
-
-  // Grace period elapsed and user is idle — safe to run checks
-  if (options.gracePeriodElapsed && !options.promptTypingSuppressionActive) return true;
-
-  // Before grace period — don't run checks yet
-  return false;
+  if (!options.hasHadFirstSubmission) return false;
+  return true;
 }
-
-export { STARTUP_GRACE_PERIOD_MS }

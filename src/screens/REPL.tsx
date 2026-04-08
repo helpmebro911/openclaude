@@ -238,7 +238,7 @@ import { usePromptsFromClaudeInChrome } from 'src/hooks/usePromptsFromClaudeInCh
 import { getTipToShowOnSpinner, recordShownTip } from 'src/services/tips/tipScheduler.js';
 import type { Theme } from 'src/utils/theme.js';
 import { isPromptTypingSuppressionActive } from './replInputSuppression.js';
-import { shouldRunStartupChecks, STARTUP_GRACE_PERIOD_MS } from './replStartupGates.js';
+import { shouldRunStartupChecks } from './replStartupGates.js';
 import { checkAndDisableBypassPermissionsIfNeeded, checkAndDisableAutoModeIfNeeded, useKickOffCheckAndDisableBypassPermissionsIfNeeded, useKickOffCheckAndDisableAutoModeIfNeeded } from 'src/utils/permissions/bypassPermissionsKillswitch.js';
 import { SandboxManager } from 'src/utils/sandbox/sandbox-adapter.js';
 import { SANDBOX_NETWORK_ACCESS_TOOL_NAME } from 'src/cli/structuredIO.js';
@@ -1429,19 +1429,12 @@ export function REPL({
   const [pastedContents, setPastedContents] = useState<Record<number, PastedContent>>({});
   const [submitCount, setSubmitCount] = useState(0);
 
-  // Defer startup checks until the user has interacted with the prompt.
-  // A pure timeout is insufficient (issue #363): if the user pauses >1.5s
-  // before typing, the timer can still fire and recommendation dialogs can
-  // steal focus. Instead, we gate on actual prompt readiness:
-  //  - First message submitted (submitCount > 0)
-  //  - Grace period elapsed + user is not actively typing
-  //  - User is typing (deferred until they stop)
+  // Defer startup checks until the user has submitted their first message.
+  // A timeout or grace period is insufficient (issue #363): if the user pauses
+  // before typing, startup checks can still fire and recommendation dialogs
+  // steal focus. Only the user's first submission guarantees the prompt was
+  // the first thing they interacted with.
   const startupChecksStartedRef = React.useRef(false);
-  const [startupGraceElapsed, setStartupGraceElapsed] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setStartupGraceElapsed(true), STARTUP_GRACE_PERIOD_MS);
-    return () => clearTimeout(timer);
-  }, []);
   const hasHadFirstSubmission = (submitCount ?? 0) > 0;
   useEffect(() => {
     if (isRemoteSession) return;
@@ -1449,13 +1442,11 @@ export function REPL({
     if (!shouldRunStartupChecks({
       isRemoteSession,
       hasStarted: startupChecksStartedRef.current,
-      promptTypingSuppressionActive,
       hasHadFirstSubmission,
-      gracePeriodElapsed: startupGraceElapsed,
     })) return;
     startupChecksStartedRef.current = true;
     void performStartupChecks(setAppState);
-  }, [setAppState, isRemoteSession, promptTypingSuppressionActive, hasHadFirstSubmission, startupGraceElapsed]);
+  }, [setAppState, isRemoteSession, hasHadFirstSubmission]);
   // Ref instead of state to avoid triggering React re-renders on every
   // streaming text_delta. The spinner reads this via its animation timer.
   const responseLengthRef = useRef(0);
